@@ -1,0 +1,1290 @@
+// // setup.js - Script de configuración y generación del proyecto Serenity + Playwright + TS
+// import fs from 'fs-extra';
+// import path from 'path';
+// import { execSync } from 'child_process';
+
+// // Función para ejecutar comandos shell
+// function run(cmd, cwd = process.cwd()) {
+//   console.log(`\n> ${cmd}`);
+//   execSync(cmd, { stdio: 'inherit', cwd });
+// }
+
+// // Función de ayuda para crear archivos
+// function writeFile(filePath, content) {
+//   fs.outputFileSync(filePath, content, 'utf8');
+// }
+
+// // Función principal para generar proyecto
+// export async function generateProject(projectName) {
+//   if (!projectName) throw new Error('El nombre del proyecto es obligatorio');
+
+//   const projectPath = path.join(process.cwd(), projectName);
+//   fs.ensureDirSync(projectPath);
+
+//   console.log(`==> Inicializando proyecto Node: ${projectName}`);
+//   run('npm init -y', projectPath);
+
+//   console.log('==> Instalando dependencias...');
+//   const deps = [
+//     "typescript","ts-node","@types/node",
+//     "@serenity-js/core@latest",
+//     "@serenity-js/cucumber@latest",
+//     "@serenity-js/playwright@latest",
+//     "@serenity-js/serenity-bdd@latest",
+//     "@serenity-js/assertions@latest",
+//     "@serenity-js/web@latest",
+//     "@cucumber/cucumber@latest",
+//     "playwright@latest",
+//     "dotenv@latest",
+//     "chai","@types/chai",
+//     "rimraf@latest"
+//   ];
+//   run(`npm install --save-dev ${deps.join(' ')}`, projectPath);
+//   run('npm audit fix --force', projectPath);
+
+//   console.log('==> Instalando navegadores de Playwright...');
+//   run('npx playwright install', projectPath);
+
+//   console.log('==> Creando estructura de carpetas...');
+//   [
+//     'src/PageObject','src/Questions','src/Model','src/Tasks',
+//     'src/StepsDefinitions','src/Util','src/Resource/SetData',
+//     'src/Resource/features','src/config','.github/workflows'
+//   ].forEach(dir => fs.ensureDirSync(path.join(projectPath, dir)));
+
+//   console.log('==> Creando archivos iniciales...');
+
+//   // .env
+//   writeFile(path.join(projectPath, '.env'), `
+// BASE_URL=https://mcstaging.supermercadosnacional.com/customer/account/create/
+// HEADLESS=false
+// TAGS=@smoke
+// BROWSER=chrome
+// IMPLICIT_WAIT=10
+//   `.trim());
+
+//   // src/config/env.ts
+//   writeFile(path.join(projectPath, 'src/config/env.ts'), `
+// import 'dotenv/config';
+// export const Env = {
+//   baseUrl: process.env.BASE_URL ?? 'https://mcstaging.supermercadosnacional.com/',  
+// };
+//   `.trim());
+
+//   // src/config/hooks.ts
+//   writeFile(path.join(projectPath,'src/config/hooks.ts'), `
+// import { actorCalled, configure } from '@serenity-js/core';
+// import { BrowseTheWebWithPlaywright } from '@serenity-js/playwright';
+// import { TakeScreenshot } from '@serenity-js/web';
+// import { chromium } from 'playwright';
+// import { Before, After, setWorldConstructor, BeforeAll, AfterStep } from '@cucumber/cucumber';
+// import path from 'path';
+
+// export class CustomWorld { actor: any; }
+// setWorldConstructor(CustomWorld);
+
+// Before({ timeout: 40000 }, async function () {
+//   const headless = process.env.HEADLESS === 'true' || false;
+//   const browser = await chromium.launch({ 
+//     channel: 'chrome',
+//     headless,
+//     args: [
+//       '--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage',
+//       '--disable-accelerated-2d-canvas','--no-first-run','--no-zygote',
+//       '--single-process','--disable-gpu','--start-maximized'
+//     ]
+//   });
+//   const context = await browser.newContext();
+//   const page = await context.newPage();
+
+//   this.actor = actorCalled('Tester User').whoCan(
+//     BrowseTheWebWithPlaywright.usingPage(page)
+//   );
+
+//   this.cleanup = async () => { await page.close(); await context.close(); await browser.close(); }
+// });
+
+// BeforeAll({ timeout: 40000 }, async function() {
+//   console.log('BeforeAll: Starting test suite...');
+//   configure({
+//     crew: [
+//       ['@serenity-js/serenity-bdd', { 
+//         specDirectory: path.resolve(__dirname,'../Resource/features'),
+//         reporter:{ includeAbilityDetails: true },
+//       }],
+//       ['@serenity-js/core:ArtifactArchiver', {
+//         outputDirectory: path.resolve(__dirname,'../../target/site/serenity'),
+//       }]
+//     ]
+//   });
+// });
+
+// After(async function () { if(this.cleanup) await this.cleanup(); });
+// AfterStep(async function () { if(this.actor) await this.actor.attemptsTo(TakeScreenshot.of('step')); });
+//   `.trim());
+
+//   // src/Tasks/OpenPage.ts
+//   writeFile(path.join(projectPath,'src/Tasks/OpenPage.ts'), `
+// import { Task, Interaction } from '@serenity-js/core';
+// import { Navigate } from '@serenity-js/web';
+
+// export class OpenPage {
+//   static atBaseUrl(){
+//     return Task.where('#open the application base URL',
+//       Navigate.to(process.env.BASE_URL || 'https://mcstaging.supermercadosnacional.com/'),
+//       Interaction.where('#wait for 20 seconds', async() => {
+//         await new Promise(resolve => setTimeout(resolve, 20000));
+//       })
+//     );
+//   }
+// }
+//   `.trim());
+
+//   // src/StepsDefinitions/OpenPage.steps.ts
+//   writeFile(path.join(projectPath,'src/StepsDefinitions/OpenPage.steps.ts'), `
+// import { Given, Then } from '@cucumber/cucumber';
+// import { Ensure, equals } from '@serenity-js/assertions';
+// import { OpenPage } from '../Tasks/OpenPage';
+// import { CustomWorld } from '../config/hooks';
+// import { ReviweHomePage } from '../Questions/ReviweHomePage';
+
+// Given('the user opens the application', { timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(OpenPage.atBaseUrl());
+// });
+
+// Then('the user should see the homepage',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(ReviweHomePage.isVisibleMainContent, equals(true)));
+// });
+
+// Then('the page title should be My Store',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(this.actor.answer(ReviweHomePage.isVisibleTitle), equals(true)));
+// });
+//   `.trim());
+
+//   // src/PageObject/Home.page.ts
+//   writeFile(path.join(projectPath,'src/PageObject/Home.page.ts'), `
+// export class HomePage {
+//   static readonly FORM_TITLE = '//div[@class="block-title"]//div[@class="form-title__logos"]';
+//   static readonly MAIN_CONTENT = '//main[@id="maincontent"]';
+// }
+//   `.trim());
+
+//   // src/Questions/ReviweHomePage.ts
+//   writeFile(path.join(projectPath,'src/Questions/ReviweHomePage.ts'), `
+// import { Question, Wait, AnswersQuestions, UsesAbilities, Duration} from '@serenity-js/core';
+// import { PageElement, By, isVisible } from '@serenity-js/web';
+// import { HomePage } from '../PageObject/Home.page';
+
+// export class ReviweHomePage {
+//   public static readonly isVisibleMainContent = Question.about('the main content of the page', async (actor: AnswersQuestions & UsesAbilities) =>{
+//       Wait.upTo(Duration.ofSeconds(10)).until(
+//           PageElement.located(By.xpath(HomePage.MAIN_CONTENT)).describedAs('Main Content'),
+//           isVisible()
+//       );
+//       const element_mainContent = PageElement.located(By.xpath(HomePage.MAIN_CONTENT));
+//       return await actor.answer(element_mainContent.isVisible());
+//   });
+
+//   public static readonly isVisibleTitle = Question.about('the title of the form', async (actor: AnswersQuestions & UsesAbilities) =>{
+//       Wait.upTo(Duration.ofSeconds(10)).until(
+//           PageElement.located(By.xpath(HomePage.FORM_TITLE)).describedAs('Form Title'),
+//           isVisible()
+//       );
+//       const element_formTitle = PageElement.located(By.xpath(HomePage.FORM_TITLE));
+//       return await actor.answer(element_formTitle.isVisible());
+//   });
+// }
+//   `.trim());
+
+//   // src/Resource/features/open_page.feature
+//   writeFile(path.join(projectPath,'src/Resource/features/open_page.feature'), `
+// Feature: Open application
+
+//   @smoke
+//   Scenario: User opens the base URL
+//     Given the user opens the application
+//     Then the user should see the homepage
+//     And the page title should be My Store
+//   `.trim());
+
+//   // cucumber.js
+//   writeFile(path.join(projectPath,'cucumber.js'), `
+// module.exports = {
+//   default: {
+//     requireModule: ['ts-node/register'],
+//     require: ['src/StepsDefinitions/**/*.ts', 'src/config/**/*.ts'],
+//     paths: ['src/Resource/features/**/*.feature'],
+//     format: ['@serenity-js/cucumber','summary','progress-bar'],
+//     tags: process.env.TAGS || '@smoke'
+//   }
+// };
+//   `.trim());
+
+//   // tsconfig.json
+//   writeFile(path.join(projectPath,'tsconfig.json'), `
+// {
+//   "compilerOptions": {
+//     "target": "ES2020",
+//     "module": "CommonJS",
+//     "lib": ["ES2020", "DOM"],
+//     "strict": true,
+//     "esModuleInterop": true,
+//     "moduleResolution": "node",
+//     "ignoreDeprecations": "6.0",
+//     "resolveJsonModule": true,
+//     "outDir": "dist"
+//   }
+// }
+//   `.trim());
+
+//   // .gitignore
+//   writeFile(path.join(projectPath,'.gitignore'), `
+// node_modules/
+// npm-debug.log
+// yarn-error.log
+// dist/
+// target/
+// .serenity/
+// coverage/
+// .env
+// .vscode/
+// .idea/
+//   `.trim());
+
+//   // GitHub Actions workflow
+//   writeFile(path.join(projectPath,'.github/workflows/serenity-report.yml'), `
+// name: Serenity BDD Report
+
+// on:
+//   push:
+//     branches: [main]
+//   pull_request:
+//     branches: [main]
+
+// jobs:
+//   test:
+//     runs-on: ubuntu-latest
+//     steps:
+//       - name: Checkout code
+//         uses: actions/checkout@v4
+//       - name: Set up Node.js
+//         uses: actions/setup-node@v4
+//         with:
+//           node-version: '20'
+//       - name: Install dependencies
+//         run: npm ci
+//       - name: Install Java 17
+//         uses: actions/setup-java@v4
+//         with:
+//           distribution: 'temurin'
+//           java-version: '17'
+//       - name: Run tests and generate Serenity JSON
+//         run: >
+//           npx cucumber-js --require-module ts-node/register --require src/config/hooks.ts src/StepsDefinitions/**/*.ts src/Resource/features/**/*.feature --format @serenity-js/cucumber --format-options "{\\"outputDirectory\\": \\"target/site/serenity\\", \\"specDirectory\\": \\"src/Resource/features\\"}"
+//         continue-on-error: true
+//       - name: Generate Serenity BDD HTML report
+//         run: npx serenity-bdd run
+//       - name: Upload Serenity report artifact
+//         uses: actions/upload-artifact@v4
+//         with:
+//           name: serenity-report
+//           path: target/site/serenity
+//       - name: Deploy Serenity Report to GitHub Pages
+//         uses: peaceiris/actions-gh-pages@v3
+//         with:
+//           github_token: \${{ secrets.GITHUB_TOKEN }}
+//           publish_dir: ./target/site/serenity
+//   `.trim());
+
+//   console.log(`\n✅ Proyecto "${projectName}" generado correctamente en ${projectPath}`);
+//   console.log('Ejecuta `npx cucumber-js` manualmente para correr las pruebas iniciales.');
+//   return projectPath;
+// }
+
+
+// //--------------------------------------------------------------------------------------
+// // setup.js - Script de configuración y generación del proyecto Serenity + Playwright + TS
+// import fs from 'fs-extra';
+// import path from 'path';
+// import { spawnSync } from 'child_process';
+
+// // Función para logging al stream (stdout por defecto)
+// function log(msg, stream = process.stdout) {
+//   stream.write(msg + '\n');
+// }
+
+// // Ejecutar comando shell y capturar logs
+// function run(cmd, cwd = process.cwd(), stream = process.stdout) {
+//   log(`\n> ${cmd}`, stream);
+//   const result = spawnSync(cmd, { shell: true, cwd, stdio: 'pipe' });
+//   if (result.stdout) stream.write(result.stdout.toString());
+//   if (result.stderr) stream.write(result.stderr.toString());
+// }
+
+// // Función para escribir archivos
+// function writeFile(filePath, content) {
+//   fs.outputFileSync(filePath, content, 'utf8');
+// }
+
+// // Función principal para generar proyecto
+// export async function generateProject(projectName, stream = process.stdout) {
+//   if (!projectName) throw new Error('El nombre del proyecto es obligatorio');
+
+//   const projectPath = path.join(process.cwd(), projectName);
+//   fs.ensureDirSync(projectPath);
+
+//   log(`==> Inicializando proyecto Node: ${projectName}`, stream);
+//   run('npm init -y', projectPath, stream);
+
+//   log('==> Instalando dependencias...', stream);
+//   const deps = [
+//     "typescript","ts-node","@types/node",
+//     "@serenity-js/core@latest",
+//     "@serenity-js/cucumber@latest",
+//     "@serenity-js/playwright@latest",
+//     "@serenity-js/serenity-bdd@latest",
+//     "@serenity-js/assertions@latest",
+//     "@serenity-js/web@latest",
+//     "@cucumber/cucumber@latest",
+//     "playwright@latest",
+//     "dotenv@latest",
+//     "chai","@types/chai",
+//     "rimraf@latest"
+//   ];
+//   run(`npm install --save-dev ${deps.join(' ')}`, projectPath, stream);
+//   run('npm audit fix --force', projectPath, stream);
+
+//   log('==> Instalando navegadores de Playwright...', stream);
+//   run('npx playwright install', projectPath, stream);
+
+//   log('==> Creando estructura de carpetas...', stream);
+//   [
+//     'src/PageObject','src/Questions','src/Model','src/Tasks',
+//     'src/StepsDefinitions','src/Util','src/Resource/SetData',
+//     'src/Resource/features','src/config','.github/workflows'
+//   ].forEach(dir => fs.ensureDirSync(path.join(projectPath, dir)));
+
+//   log('==> Creando archivos iniciales...', stream);
+
+//   // .env
+//   writeFile(path.join(projectPath, '.env'), `
+// BASE_URL=https://mcstaging.supermercadosnacional.com/customer/account/create/
+// HEADLESS=false
+// TAGS=@smoke
+// BROWSER=chrome
+// IMPLICIT_WAIT=10
+//   `.trim());
+
+//   // src/config/env.ts
+//   writeFile(path.join(projectPath, 'src/config/env.ts'), `
+// import 'dotenv/config';
+// export const Env = {
+//   baseUrl: process.env.BASE_URL ?? 'https://mcstaging.supermercadosnacional.com/',  
+// };
+//   `.trim());
+
+//   // src/config/hooks.ts
+//   writeFile(path.join(projectPath,'src/config/hooks.ts'), `
+// import { actorCalled, configure } from '@serenity-js/core';
+// import { BrowseTheWebWithPlaywright } from '@serenity-js/playwright';
+// import { TakeScreenshot } from '@serenity-js/web';
+// import { chromium } from 'playwright';
+// import { Before, After, setWorldConstructor, BeforeAll, AfterStep } from '@cucumber/cucumber';
+// import path from 'path';
+
+// export class CustomWorld { actor: any; }
+// setWorldConstructor(CustomWorld);
+
+// Before({ timeout: 40000 }, async function () {
+//   const headless = process.env.HEADLESS === 'true' || false;
+//   const browser = await chromium.launch({ 
+//     channel: 'chrome',
+//     headless,
+//     args: [
+//       '--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage',
+//       '--disable-accelerated-2d-canvas','--no-first-run','--no-zygote',
+//       '--single-process','--disable-gpu','--start-maximized'
+//     ]
+//   });
+//   const context = await browser.newContext();
+//   const page = await context.newPage();
+
+//   this.actor = actorCalled('Tester User').whoCan(
+//     BrowseTheWebWithPlaywright.usingPage(page)
+//   );
+
+//   this.cleanup = async () => { await page.close(); await context.close(); await browser.close(); }
+// });
+
+// BeforeAll({ timeout: 40000 }, async function() {
+//   log('BeforeAll: Starting test suite...', process.stdout);
+//   configure({
+//     crew: [
+//       ['@serenity-js/serenity-bdd', { 
+//         specDirectory: path.resolve(__dirname,'../Resource/features'),
+//         reporter:{ includeAbilityDetails: true },
+//       }],
+//       ['@serenity-js/core:ArtifactArchiver', {
+//         outputDirectory: path.resolve(__dirname,'../../target/site/serenity'),
+//       }]
+//     ]
+//   });
+// });
+
+// After(async function () { if(this.cleanup) await this.cleanup(); });
+// AfterStep(async function () { if(this.actor) await this.actor.attemptsTo(TakeScreenshot.of('step')); });
+//   `.trim());
+
+//   // src/Tasks/OpenPage.ts
+//   writeFile(path.join(projectPath,'src/Tasks/OpenPage.ts'), `
+// import { Task, Interaction } from '@serenity-js/core';
+// import { Navigate } from '@serenity-js/web';
+
+// export class OpenPage {
+//   static atBaseUrl(){
+//     return Task.where('#open the application base URL',
+//       Navigate.to(process.env.BASE_URL || 'https://mcstaging.supermercadosnacional.com/'),
+//       Interaction.where('#wait for 20 seconds', async() => {
+//         await new Promise(resolve => setTimeout(resolve, 20000));
+//       })
+//     );
+//   }
+// }
+//   `.trim());
+
+//   // src/StepsDefinitions/OpenPage.steps.ts
+//   writeFile(path.join(projectPath,'src/StepsDefinitions/OpenPage.steps.ts'), `
+// import { Given, Then } from '@cucumber/cucumber';
+// import { Ensure, equals } from '@serenity-js/assertions';
+// import { OpenPage } from '../Tasks/OpenPage';
+// import { CustomWorld } from '../config/hooks';
+// import { ReviweHomePage } from '../Questions/ReviweHomePage';
+
+// Given('the user opens the application', { timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(OpenPage.atBaseUrl());
+// });
+
+// Then('the user should see the homepage',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(ReviweHomePage.isVisibleMainContent, equals(true)));
+// });
+
+// Then('the page title should be My Store',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(this.actor.answer(ReviweHomePage.isVisibleTitle), equals(true)));
+// });
+//   `.trim());
+
+//   // PageObject, Questions, Features, cucumber.js, tsconfig.json, .gitignore, GitHub workflow
+//   // Se mantienen igual que en tu código original...
+
+//   log(`\n✅ Proyecto "${projectName}" generado correctamente en ${projectPath}`, stream);
+//   return projectPath;
+// }
+
+
+
+
+///#############################################################
+
+
+
+
+
+
+// import express from "express";
+// import cors from "cors";
+// import fs from "fs-extra";
+// import archiver from "archiver";
+// import path from "path";
+
+// const app = express();
+// app.use(cors());
+// app.use(express.json()); // 👈 Para parsear JSON en el body
+// const PORT = 3001;
+
+// app.post("/download", async (req, res) => {
+//   const { projectName, framework, language } = req.body;  
+
+//   if (!projectName) {
+//     return res.status(400).send("El nombre del proyecto es obligatorio.");
+//   }
+
+//   console.log(`📦 Generando proyecto: ${projectName}`);
+//   console.log(`🛠️ Lenguaje: ${language}, Framework: ${framework}`);
+
+//   res.setHeader("Content-Type", "application/zip");
+//   res.setHeader("Content-Disposition", `attachment; filename=${projectName}.zip`);
+
+//   const archive = archiver("zip", { zlib: { level: 9 } });
+
+//   archive.on("error", (err) => {
+//     console.error("❌ Error en archiver:", err);
+//     res.status(500).send("Error generando el ZIP.");
+//   });
+
+//   archive.pipe(res);
+
+//   // Por ahora siempre usa la misma carpeta base
+//   // (más adelante puedes crear lógica condicional según language/framework)
+//   archive.directory(path.join(process.cwd(), "template-playwright/"), false);
+
+//   archive.finalize();
+// });
+
+// app.listen(PORT, () => {
+//   console.log(`✅ Backend corriendo en http://localhost:${PORT}`);
+// });
+// import express from "express";
+// import cors from "cors";
+// import archiver from "archiver";
+// import path from "path";
+// import fs from "fs-extra";
+// import { generateProject } from "./setup.js";
+
+// const app = express();
+// app.use(cors());
+// app.use(express.json());
+// const PORT = 3001;
+
+// app.post("/download", async (req, res) => {
+//   const { projectName } = req.body;
+//   if (!projectName) return res.status(400).send("El nombre del proyecto es obligatorio.");
+
+//   try {
+//     const projectPath = await generateProject(projectName);
+
+//     res.setHeader("Content-Type", "application/zip");
+//     res.setHeader("Content-Disposition", `attachment; filename=${projectName}.zip`);
+
+//     const archive = archiver("zip", { zlib: { level: 9 } });
+//     archive.pipe(res);
+//     archive.directory(projectPath, false);
+//     archive.finalize();
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).send("Error generando proyecto.");
+//   }
+// });
+
+// app.listen(PORT, () => console.log(`✅ Backend corriendo en http://localhost:${PORT}`));
+
+
+// index.js
+
+
+// import { useEffect, useState } from "react";
+// import "./index.css"; // mantenemos index.css para estilos globales
+
+// function App() {  
+
+//   const [projectName, setProjectName] = useState("");
+//   const [language, setLanguage] = useState("ts");
+//   const [framework, setFramework] = useState("playwright");
+//   const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "warning" | "" }>({
+//     text: "",
+//     type: "",
+//   });
+
+//   const [logs, setLogs] = useState('');
+
+//   useEffect(() => {
+//     const evtSource = new EventSource('http://localhost:3001/log?' + projectName);
+
+//     evtSource.onmessage = (event) => {
+//       setLogs(prev => prev + event.data + '\n');
+//     };
+
+//     evtSource.onerror = () => {
+//       setLogs(prev => prev + '\n[Error en la conexión SSE]');
+//       evtSource.close();
+//     };
+
+//     return () => evtSource.close();
+//   }, []);
+
+//   const handleGenerate = async () => {
+//     setMessage({ text: "⏳ Generando proyecto...", type: "warning" });
+
+//     try {
+//       const res = await fetch("http://localhost:3001/download", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ projectName, language, framework }),
+//       });
+
+//       if (!res.ok) {
+//         const errorText = await res.text();
+//         throw new Error(errorText);
+//       }
+
+//       const blob = await res.blob();
+//       const url = window.URL.createObjectURL(blob);
+//       const a = document.createElement("a");
+//       a.href = url;
+//       a.download = `${projectName || "proyecto"}.zip`;
+//       document.body.appendChild(a);
+//       a.click();
+//       a.remove();
+//       window.URL.revokeObjectURL(url);
+
+//       setMessage({
+//         text: `✅ Proyecto "${projectName}" generado con éxito 🚀`,
+//         type: "success",
+//       });
+//     } catch (err) {
+//       console.error("❌ Error:", err);
+//       setMessage({ text: `❌ ${err}`, type: "error" });
+//     }
+//   };
+
+//   // 🎨 mapa de estilos de mensajes
+//   const messageStyles: Record<string, string> = {
+//     success: "bg-green-100 text-green-800 border border-green-300",
+//     error: "bg-red-100 text-red-800 border border-red-300",
+//     warning: "bg-yellow-100 text-yellow-800 border border-yellow-300",
+//   };
+
+//   return (
+//     <div className="flex flex-col min-h-screen">
+//       {/* Header */}
+//       <header className="bg-gradient-to-r from-blue-600 to-blue-400 text-white py-4 shadow-md">
+//         <div className="container mx-auto px-4 flex justify-between items-center">
+//           <h1 className="text-xl font-bold">⚡ Playwright Project Generator</h1>          
+//         </div>
+//       </header>
+
+//       {/* Main */}
+//       <main className="flex-grow flex items-center justify-center bg-gray-100">
+//         <div className="bg-white shadow-xl rounded-2xl p-8 max-w-lg w-full text-center">
+//           <h2 className="text-3xl font-bold mb-6 text-blue-700">
+//             Generador de Proyectos
+//           </h2>
+
+//           {/* Mensajes */}
+//           {message.text && (
+//             <div
+//               className={`mb-4 p-3 rounded-lg text-sm ${
+//                 messageStyles[message.type] || ""
+//               }`}
+//             >
+//               {message.text}
+//             </div>
+//           )}
+
+//           <div className="space-y-4 text-left">
+//             {/* Nombre del proyecto */}
+//             <div>
+//               <label
+//                 htmlFor="projectName"
+//                 className="block mb-1 font-medium text-gray-700"
+//               >
+//                 📦 Nombre del proyecto
+//               </label>
+//               <input
+//                 id="projectName"
+//                 value={projectName}
+//                 onChange={(e) => setProjectName(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//                 placeholder="mi-proyecto"
+//               />
+//             </div>
+
+//             {/* Lenguaje */}
+//             <div>
+//               <label
+//                 htmlFor="language"
+//                 className="block mb-1 font-medium text-gray-700"
+//               >
+//                 🛠️ Lenguaje
+//               </label>
+//               <select
+//                 id="language"
+//                 value={language}
+//                 onChange={(e) => setLanguage(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//               >
+//                 <option value="ts">TypeScript</option>
+//                 <option value="js">JavaScript</option>
+//               </select>
+//             </div>
+
+//             {/* Framework */}
+//             <div>
+//               <label
+//                 htmlFor="framework"
+//                 className="block mb-1 font-medium text-gray-700"
+//               >
+//                 🧪 Framework
+//               </label>
+//               <select
+//                 id="framework"
+//                 value={framework}
+//                 onChange={(e) => setFramework(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//               >
+//                 <option value="playwright">Playwright</option>
+//                 <option value="cucumber">Playwright + Cucumber</option>
+//                 <option value="serenity">Playwright + Serenity/JS</option>
+//               </select>
+//             </div>
+
+//             {/* Botón */}
+//             <button
+//               type="button"
+//               onClick={handleGenerate}
+//               className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition"
+//             >
+//               🚀 Generar Proyecto
+//             </button>
+//           </div>
+//         </div>
+//       </main>
+
+//        <div style={{ padding: '20px' }}>
+//       <h2>Logs de creación del proyecto</h2>
+//       <pre style={{ background: '#1e1e1e', color: '#fff', padding: '15px', maxHeight: '70vh', overflowY: 'scroll' }}>
+//         {logs}
+//       </pre>
+//     </div>
+
+//       {/* Footer */}
+//       <footer className="bg-gray-900 text-gray-400 text-center py-4">
+//         <p>
+//           © {new Date().getFullYear()} Playwright Generator · Construido con{" "}
+//           <span className="text-blue-400">React + Tailwind</span>
+//         </p>
+//       </footer>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+
+
+// import { useEffect, useRef, useState } from "react";
+// import "./index.css";
+
+// function App() {
+//   const [projectName, setProjectName] = useState("");
+//   const [language, setLanguage] = useState("ts");
+//   const [framework, setFramework] = useState("playwright");
+//   const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "warning" | "" }>({
+//     text: "",
+//     type: "",
+//   });
+//   const [logs, setLogs] = useState("");
+
+//   const logsRef = useRef<HTMLPreElement>(null);
+//   const evtSourceRef = useRef<EventSource | null>(null);
+
+//   // Función para inicializar SSE
+//   const initSSE = () => {
+//     if (!projectName) return;
+
+//     evtSourceRef.current?.close();
+
+//     const evtSource = new EventSource(`http://localhost:3001/log?projectName=${projectName}`);
+//     evtSourceRef.current = evtSource;
+
+//     evtSource.onmessage = (event) => {
+//       setLogs(prev => prev + event.data + "\n");
+//     };
+
+//     evtSource.onerror = () => {
+//       setLogs(prev => prev + "\n[Error en la conexión SSE, reintentando...]");
+//       evtSource.close();
+//       // Reconectar después de 3 segundos
+//       setTimeout(() => initSSE(), 3000);
+//     };
+//   };
+
+//   useEffect(() => {
+//     initSSE();
+
+//     return () => evtSourceRef.current?.close();
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [projectName]);
+
+//   // Scroll automático al final de los logs
+//   useEffect(() => {
+//     if (logsRef.current) {
+//       logsRef.current.scrollTop = logsRef.current.scrollHeight;
+//     }
+//   }, [logs]);
+
+//   const handleGenerate = async () => {
+//     if (!projectName) {
+//       setMessage({ text: "❌ Debes ingresar un nombre de proyecto", type: "error" });
+//       return;
+//     }
+
+//     setLogs(""); // limpiar logs
+//     setMessage({ text: "⏳ Generando proyecto...", type: "warning" });
+
+//     try {
+//       const res = await fetch("http://localhost:3001/download", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ projectName, language, framework }),
+//       });
+
+//       if (!res.ok) {
+//         const errorText = await res.text();
+//         throw new Error(errorText);
+//       }
+
+//       const blob = await res.blob();
+//       const url = window.URL.createObjectURL(blob);
+//       const a = document.createElement("a");
+//       a.href = url;
+//       a.download = `${projectName}.zip`;
+//       document.body.appendChild(a);
+//       a.click();
+//       a.remove();
+//       window.URL.revokeObjectURL(url);
+
+//       setMessage({ text: `✅ Proyecto "${projectName}" generado con éxito 🚀`, type: "success" });
+//     } catch (err) {
+//       console.error("❌ Error:", err);
+//       setMessage({ text: `❌ ${err}`, type: "error" });
+//     }
+//   };
+
+//   const messageStyles: Record<string, string> = {
+//     success: "bg-green-100 text-green-800 border border-green-300",
+//     error: "bg-red-100 text-red-800 border border-red-300",
+//     warning: "bg-yellow-100 text-yellow-800 border border-yellow-300",
+//   };
+
+//   return (
+//     <div className="flex flex-col min-h-screen">
+//       <header className="bg-gradient-to-r from-blue-600 to-blue-400 text-white py-4 shadow-md">
+//         <div className="container mx-auto px-4 flex justify-between items-center">
+//           <h1 className="text-xl font-bold">⚡ Playwright Project Generator</h1>
+//         </div>
+//       </header>
+
+//       <main className="flex-grow flex items-center justify-center bg-gray-100">
+//         <div className="bg-white shadow-xl rounded-2xl p-8 max-w-lg w-full text-center">
+//           <h2 className="text-3xl font-bold mb-6 text-blue-700">Generador de Proyectos</h2>
+
+//           {message.text && (
+//             <div className={`mb-4 p-3 rounded-lg text-sm ${messageStyles[message.type] || ""}`}>
+//               {message.text}
+//             </div>
+//           )}
+
+//           <div className="space-y-4 text-left">
+//             <div>
+//               <label htmlFor="projectName" className="block mb-1 font-medium text-gray-700">
+//                 📦 Nombre del proyecto
+//               </label>
+//               <input
+//                 id="projectName"
+//                 value={projectName}
+//                 onChange={(e) => setProjectName(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//                 placeholder="mi-proyecto"
+//               />
+//             </div>
+
+//             <div>
+//               <label htmlFor="language" className="block mb-1 font-medium text-gray-700">
+//                 🛠️ Lenguaje
+//               </label>
+//               <select
+//                 id="language"
+//                 value={language}
+//                 onChange={(e) => setLanguage(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//               >
+//                 <option value="ts">TypeScript</option>
+//                 <option value="js">JavaScript</option>
+//               </select>
+//             </div>
+
+//             <div>
+//               <label htmlFor="framework" className="block mb-1 font-medium text-gray-700">
+//                 🧪 Framework
+//               </label>
+//               <select
+//                 id="framework"
+//                 value={framework}
+//                 onChange={(e) => setFramework(e.target.value)}
+//                 className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+//               >
+//                 <option value="playwright">Playwright</option>
+//                 <option value="cucumber">Playwright + Cucumber</option>
+//                 <option value="serenity">Playwright + Serenity/JS</option>
+//               </select>
+//             </div>
+
+//             <button
+//               type="button"
+//               onClick={handleGenerate}
+//               className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition"
+//             >
+//               🚀 Generar Proyecto
+//             </button>
+//           </div>
+//         </div>
+//       </main>
+
+//       <div style={{ padding: "20px" }}>
+//         <h2>Logs de creación del proyecto</h2>
+//         <pre
+//           ref={logsRef}
+//           style={{
+//             background: "#1e1e1e",
+//             color: "#fff",
+//             padding: "15px",
+//             maxHeight: "70vh",
+//             overflowY: "auto",
+//             fontFamily: "monospace",
+//             whiteSpace: "pre-wrap",
+//             wordWrap: "break-word",
+//           }}
+//         >
+//           {logs}
+//         </pre>
+//       </div>
+
+//       <footer className="bg-gray-900 text-gray-400 text-center py-4">
+//         <p>
+//           © {new Date().getFullYear()} Playwright Generator · Construido con{" "}
+//           <span className="text-blue-400">React + Tailwind</span>
+//         </p>
+//       </footer>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+
+
+// // setup-sse.js - Script completo de configuración de Serenity + Playwright + TS con SSE
+// import fs from 'fs-extra';
+// import path from 'path';
+// import { spawn } from 'child_process';
+
+// // Logging SSE
+// function log(msg, stream) {
+//   if (stream && stream.write) stream.write(`data: ${msg}\n\n`);
+//   console.log(msg);
+// }
+
+// // Ejecutar comando shell con logs en tiempo real
+// function run(cmd, cwd = process.cwd(), stream) {
+//   return new Promise((resolve, reject) => {
+//     log(`\n> ${cmd}`, stream);
+//     const child = spawn(cmd, { shell: true, cwd });
+
+//     child.stdout.on('data', (data) => log(data.toString().trim(), stream));
+//     child.stderr.on('data', (data) => log(data.toString().trim(), stream));
+
+//     child.on('close', (code) => {
+//       if (code === 0) resolve();
+//       else reject(new Error(`${cmd} exited with code ${code}`));
+//     });
+//   });
+// }
+
+// // Crear archivo
+// function writeFile(filePath, content, stream) {
+//   fs.outputFileSync(filePath, content, 'utf8');
+//   log(`Archivo creado: ${filePath}`, stream);
+// }
+
+// // Generación del proyecto
+// export async function generateProject(projectName, stream) {
+//   if (!projectName) throw new Error('El nombre del proyecto es obligatorio');
+//   const projectPath = path.join(process.cwd(), projectName);
+//   fs.ensureDirSync(projectPath);
+//   log(`==> Creando proyecto: ${projectName}`, stream);
+
+//   // Inicialización Node
+//   await run('npm init -y', projectPath, stream);
+
+//   // Dependencias
+//   const deps = [
+//     "typescript","ts-node","@types/node",
+//     "@serenity-js/core@latest",
+//     "@serenity-js/cucumber@latest",
+//     "@serenity-js/playwright@latest",
+//     "@serenity-js/serenity-bdd@latest",
+//     "@serenity-js/assertions@latest",
+//     "@serenity-js/web@latest",
+//     "@cucumber/cucumber@latest",
+//     "playwright@latest",
+//     "dotenv@latest",
+//     "chai","@types/chai",
+//     "rimraf@latest"
+//   ];
+//   await run(`npm install --save-dev ${deps.join(' ')}`, projectPath, stream);
+//   await run('npm audit fix --force', projectPath, stream);
+
+//   // Playwright navegadores
+//   await run('npx playwright install', projectPath, stream);
+
+//   // Carpetas
+//   const dirs = [
+//     'src/PageObject','src/Questions','src/Model','src/Tasks',
+//     'src/StepsDefinitions','src/Util','src/Resource/SetData',
+//     'src/Resource/features','src/config','.github/workflows'
+//   ];
+//   dirs.forEach(dir => {
+//     fs.ensureDirSync(path.join(projectPath, dir));
+//     log(`Carpeta creada: ${dir}`, stream);
+//   });
+
+//   // Archivos iniciales
+//   writeFile(path.join(projectPath, '.env'), `
+// BASE_URL=https://mcstaging.supermercadosnacional.com/customer/account/create/
+// HEADLESS=false
+// TAGS=@smoke
+// BROWSER=chrome
+// IMPLICIT_WAIT=10
+//   `.trim(), stream);
+
+//   writeFile(path.join(projectPath, 'src/config/env.ts'), `
+// import 'dotenv/config';
+// export const Env = {
+//   baseUrl: process.env.BASE_URL ?? 'https://mcstaging.supermercadosnacional.com/',  
+// };
+//   `.trim(), stream);
+
+//   writeFile(path.join(projectPath,'src/config/hooks.ts'), `
+// import { actorCalled, configure } from '@serenity-js/core';
+// import { BrowseTheWebWithPlaywright } from '@serenity-js/playwright';
+// import { TakeScreenshot } from '@serenity-js/web';
+// import { chromium } from 'playwright';
+// import { Before, After, setWorldConstructor, BeforeAll, AfterStep } from '@cucumber/cucumber';
+// import path from 'path';
+
+// export class CustomWorld { actor: any; }
+// setWorldConstructor(CustomWorld);
+
+// Before({ timeout: 40000 }, async function () {
+//   const headless = process.env.HEADLESS === 'true' || false;
+//   const browser = await chromium.launch({ 
+//     channel: 'chrome',
+//     headless,
+//     args: [
+//       '--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage',
+//       '--disable-accelerated-2d-canvas','--no-first-run','--no-zygote',
+//       '--single-process','--disable-gpu','--start-maximized'
+//     ]
+//   });
+//   const context = await browser.newContext();
+//   const page = await context.newPage();
+
+//   this.actor = actorCalled('Tester User').whoCan(
+//     BrowseTheWebWithPlaywright.usingPage(page)
+//   );
+
+//   this.cleanup = async () => { await page.close(); await context.close(); await browser.close(); }
+// });
+
+// BeforeAll({ timeout: 40000 }, async function() {
+//   log('BeforeAll: Starting test suite...', stream);
+//   configure({
+//     crew: [
+//       ['@serenity-js/serenity-bdd', { 
+//         specDirectory: path.resolve(__dirname,'../Resource/features'),
+//         reporter:{ includeAbilityDetails: true },
+//       }],
+//       ['@serenity-js/core:ArtifactArchiver', {
+//         outputDirectory: path.resolve(__dirname,'../../target/site/serenity'),
+//       }]
+//     ]
+//   });
+// });
+
+// After(async function () { if(this.cleanup) await this.cleanup(); });
+// AfterStep(async function () { if(this.actor) await this.actor.attemptsTo(TakeScreenshot.of('step')); });
+//   `.trim(), stream);
+
+//   writeFile(path.join(projectPath,'src/Tasks/OpenPage.ts'), `
+// import { Task, Interaction } from '@serenity-js/core';
+// import { Navigate } from '@serenity-js/web';
+
+// export class OpenPage {
+//   static atBaseUrl(){
+//     return Task.where('#open the application base URL',
+//       Navigate.to(process.env.BASE_URL || 'https://mcstaging.supermercadosnacional.com/'),
+//       Interaction.where('#wait for 20 seconds', async() => {
+//         await new Promise(resolve => setTimeout(resolve, 20000));
+//       })
+//     );
+//   }
+// }
+//   `.trim(), stream);
+
+//   writeFile(path.join(projectPath,'src/StepsDefinitions/OpenPage.steps.ts'), `
+// import { Given, Then } from '@cucumber/cucumber';
+// import { Ensure, equals } from '@serenity-js/assertions';
+// import { OpenPage } from '../Tasks/OpenPage';
+// import { CustomWorld } from '../config/hooks';
+// import { ReviweHomePage } from '../Questions/ReviweHomePage';
+
+// Given('the user opens the application', { timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(OpenPage.atBaseUrl());
+// });
+
+// Then('the user should see the homepage',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(ReviweHomePage.isVisibleMainContent, equals(true)));
+// });
+
+// Then('the page title should be My Store',{ timeout: 40000 }, async function (this: CustomWorld) {
+//   await this.actor.attemptsTo(Ensure.that(this.actor.answer(ReviweHomePage.isVisibleTitle), equals(true)));
+// });
+//   `.trim(), stream);
+
+// // PageObject
+// writeFile(path.join(projectPath,'src/PageObject/Home.page.ts'), `
+// export class HomePage {
+//   static readonly FORM_TITLE = '//div[@class="block-title"]//div[@class="form-title__logos"]';
+//   static readonly MAIN_CONTENT = '//main[@id="maincontent"]';
+// }
+//   `.trim(), stream);
+
+// // Questions
+// writeFile(path.join(projectPath,'src/Questions/ReviweHomePage.ts'), `
+// import { Question, Wait, AnswersQuestions, UsesAbilities, Duration} from '@serenity-js/core';
+// import { PageElement, By, isVisible } from '@serenity-js/web';
+// import { HomePage } from '../PageObject/Home.page';
+
+// export class ReviweHomePage {
+//   public static readonly isVisibleMainContent = Question.about('the main content of the page', async (actor: AnswersQuestions & UsesAbilities) =>{
+//       Wait.upTo(Duration.ofSeconds(10)).until(
+//           PageElement.located(By.xpath(HomePage.MAIN_CONTENT)).describedAs('Main Content'),
+//           isVisible()
+//       );
+//       const element_mainContent = PageElement.located(By.xpath(HomePage.MAIN_CONTENT));
+//       return await actor.answer(element_mainContent.isVisible());
+//   });
+
+//   public static readonly isVisibleTitle = Question.about('the title of the form', async (actor: AnswersQuestions & UsesAbilities) =>{
+//       Wait.upTo(Duration.ofSeconds(10)).until(
+//           PageElement.located(By.xpath(HomePage.FORM_TITLE)).describedAs('Form Title'),
+//           isVisible()
+//       );
+//       const element_formTitle = PageElement.located(By.xpath(HomePage.FORM_TITLE));
+//       return await actor.answer(element_formTitle.isVisible());
+//   });
+// }
+//   `.trim(), stream);
+
+// // Feature
+// writeFile(path.join(projectPath,'src/Resource/features/open_page.feature'), `
+// Feature: Open application
+
+//   @smoke
+//   Scenario: User opens the base URL
+//     Given the user opens the application
+//     Then the user should see the homepage
+//     And the page title should be My Store
+//   `.trim(), stream);
+
+// // cucumber.js
+// writeFile(path.join(projectPath,'cucumber.js'), `
+// module.exports = {
+//   default: {
+//     requireModule: ['ts-node/register'],
+//     require: ['src/StepsDefinitions/**/*.ts', 'src/config/**/*.ts'],
+//     paths: ['src/Resource/features/**/*.feature'],
+//     format: ['@serenity-js/cucumber','summary','progress-bar'],
+//     tags: process.env.TAGS || '@smoke'
+//   }
+// };
+//   `.trim(), stream);
+
+// // tsconfig.json
+// writeFile(path.join(projectPath,'tsconfig.json'), `
+// {
+//   "compilerOptions": {
+//     "target": "ES2020",
+//     "module": "CommonJS",
+//     "lib": ["ES2020", "DOM"],
+//     "strict": true,
+//     "esModuleInterop": true,
+//     "moduleResolution": "node",
+//     "ignoreDeprecations": "6.0",
+//     "resolveJsonModule": true,
+//     "outDir": "dist"
+//   }
+// }
+//   `.trim(), stream);
+
+// // .gitignore
+// writeFile(path.join(projectPath,'.gitignore'), `
+// node_modules/
+// npm-debug.log
+// yarn-error.log
+// dist/
+// target/
+// .serenity/
+// coverage/
+// .env
+// .vscode/
+// .idea/
+//   `.trim(), stream);
+
+// // GitHub Actions workflow
+// writeFile(path.join(projectPath,'.github/workflows/serenity-report.yml'), `
+// name: Serenity BDD Report
+
+// on:
+//   push:
+//     branches: [main]
+//   pull_request:
+//     branches: [main]
+
+// jobs:
+//   test:
+//     runs-on: ubuntu-latest
+//     steps:
+//       - name: Checkout code
+//         uses: actions/checkout@v4
+//       - name: Set up Node.js
+//         uses: actions/setup-node@v4
+//         with:
+//           node-version: '20'
+//       - name: Install dependencies
+//         run: npm ci
+//       - name: Install Java 17
+//         uses: actions/setup-java@v4
+//         with:
+//           distribution: 'temurin'
+//           java-version: '17'
+//       - name: Run tests and generate Serenity JSON
+//         run: >
+//           npx cucumber-js --require-module ts-node/register --require src/config/hooks.ts src/StepsDefinitions/**/*.ts src/Resource/features/**/*.feature --format @serenity-js/cucumber --format-options "{\\"outputDirectory\\": \\"target/site/serenity\\", \\"specDirectory\\": \\"src/Resource/features\\"}"
+//         continue-on-error: true
+//       - name: Generate Serenity BDD HTML report
+//         run: npx serenity-bdd run
+//       - name: Upload Serenity report artifact
+//         uses: actions/upload-artifact@v4
+//         with:
+//           name: serenity-report
+//           path: target/site/serenity
+//       - name: Deploy Serenity Report to GitHub Pages
+//         uses: peaceiris/actions-gh-pages@v3
+//         with:
+//           github_token: \${secrets.GITHUB_TOKEN}
+//           publish_dir: ./target/site/serenity
+//   `.trim(), stream);
+
+// // Ejecutar prueba inicial
+// log('==> Ejecutando prueba inicial...', stream);
+// try {
+//   await run('npx cucumber-js --require-module ts-node/register --require src/config/hooks.ts src/StepsDefinitions/**/*.ts src/Resource/features/**/*.feature --format @serenity-js/cucumber', projectPath, stream);
+//   log('✅ Prueba inicial completada', stream);
+// } catch (err) {
+//   log(`⚠️ Error prueba inicial: ${err.message}`, stream);
+// }
+
+// log(`\n✅ Proyecto "${projectName}" generado en ${projectPath}`, stream);
+// return projectPath;
+// }
