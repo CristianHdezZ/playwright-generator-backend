@@ -262,10 +262,8 @@ app.get("/log", (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  // Enviar logs históricos
   projectLogs.forEach((msg) => res.write(`data: ${msg}\n\n`));
 
-  // Intervalo para enviar nuevos logs
   const interval = setInterval(() => {
     if (projectLogs.length > 0) {
       const newLogs = projectLogs.splice(0);
@@ -295,7 +293,7 @@ app.post("/generate", async (req, res) => {
     await fs.ensureDir(tempDir);
 
     const projectPath = await generateProject(projectName, {
-      path: tempDir, // Asegúrate que generateProject use esta ruta
+      path: tempDir,
       write: (msg) => addLog(msg),
     });
 
@@ -340,7 +338,9 @@ app.get("/download-zip/:projectName", async (req, res) => {
   await archive.finalize();
 });
 
-export default app; // Para Vercel
+// ✅ Exportar handler para Vercel
+export default app;
+
 
 
 
