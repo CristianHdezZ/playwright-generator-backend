@@ -94,24 +94,24 @@ export async function generateProject(projectName, options = {}) {
   await fs.ensureDir(projectPath);
 
   // Dependencias
-  const deps = [
-    "typescript","ts-node","@types/node",
-    "@serenity-js/core@latest",
-    "@serenity-js/cucumber@latest",
-    "@serenity-js/playwright@latest",
-    "@serenity-js/serenity-bdd@latest",
-    "@serenity-js/assertions@latest",
-    "@serenity-js/web@latest",
-    "@cucumber/cucumber@latest",
-    "playwright@latest",
-    "dotenv@latest",
-    "chai","@types/chai",
-    "rimraf@latest"
-  ];
-  await run(`npm install --save-dev ${deps.join(' ')}`, projectPath, stream);
-  await run('npm audit fix --force', projectPath, stream);
-  log("🔧 Instalando dependencias...");
-  await new Promise((r) => setTimeout(r, 1500));
+//   const deps = [
+//     "typescript","ts-node","@types/node",
+//     "@serenity-js/core@latest",
+//     "@serenity-js/cucumber@latest",
+//     "@serenity-js/playwright@latest",
+//     "@serenity-js/serenity-bdd@latest",
+//     "@serenity-js/assertions@latest",
+//     "@serenity-js/web@latest",
+//     "@cucumber/cucumber@latest",
+//     "playwright@latest",
+//     "dotenv@latest",
+//     "chai","@types/chai",
+//     "rimraf@latest"
+//   ];
+//   await run(`npm install --save-dev ${deps.join(' ')}`, projectPath, stream);
+//   await run('npm audit fix --force', projectPath, stream);
+//   log("🔧 Instalando dependencias...");
+//   await new Promise((r) => setTimeout(r, 1500));
 
   // Playwright navegadores
   await run('npx playwright install', projectPath, stream);
