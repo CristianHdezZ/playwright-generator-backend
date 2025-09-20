@@ -116,6 +116,44 @@ export async function generateProject(projectName, options = {}) {
 //   // Playwright navegadores
 //   await run('npx playwright install', projectPath, stream);
 
+
+// --------------------- Sobrescribir package.json con dependencias fijas ---------------------
+  const pkg = {
+    name: projectName,
+    version: "1.0.0",
+    description: "",
+    main: "index.js",
+    scripts: {
+      test: "echo \"Error: no test specified\" && exit 1"
+    },
+    devDependencies: {
+      "typescript": "^5.2.2",
+      "ts-node": "^10.9.1",
+      "@types/node": "^20.5.1",
+      "@serenity-js/core": "^4.13.0",
+      "@serenity-js/cucumber": "^4.13.0",
+      "@serenity-js/playwright": "^4.13.0",
+      "@serenity-js/serenity-bdd": "^4.13.0",
+      "@serenity-js/assertions": "^4.13.0",
+      "@serenity-js/web": "^4.13.0",
+      "@cucumber/cucumber": "^9.0.0",
+      "playwright": "^1.41.1",
+      "dotenv": "^16.1.4",
+      "chai": "^4.3.8",
+      "@types/chai": "^4.3.5",
+      "rimraf": "^5.0.0"
+    }
+  };
+  await fs.outputFile(path.join(projectPath, 'package.json'), JSON.stringify(pkg, null, 2), 'utf8');
+  log(`package.json creado con dependencias fijas`, stream);
+
+  // --------------------- Instalar dependencias ---------------------
+  await run('npm install', projectPath, stream);
+  log("🔧 Dependencias instaladas correctamente", stream);
+
+  // --------------------- Inicializar Node y Playwright ---------------------
+  await run('npx playwright install', projectPath, stream);
+
   // Carpetas
   const dirs = [
     'src/PageObject','src/Questions','src/Model','src/Tasks',
