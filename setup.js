@@ -113,8 +113,8 @@ export async function generateProject(projectName, options = {}) {
 //   log("🔧 Instalando dependencias...");
 //   await new Promise((r) => setTimeout(r, 1500));
 
-  // Playwright navegadores
-  await run('npx playwright install', projectPath, stream);
+//   // Playwright navegadores
+//   await run('npx playwright install', projectPath, stream);
 
   // Carpetas
   const dirs = [
