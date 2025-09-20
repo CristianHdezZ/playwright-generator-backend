@@ -27,6 +27,7 @@ app.get("/log", (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  // Enviar logs históricos
   projectLogs.forEach((msg) => res.write(`data: ${msg}\n\n`));
 
   const interval = setInterval(() => {
@@ -57,6 +58,7 @@ app.post("/generate", async (req, res) => {
     const tempDir = path.join(os.tmpdir(), projectName);
     await fs.ensureDir(tempDir);
 
+    // generateProject debe usar options.path
     const projectPath = await generateProject(projectName, {
       path: tempDir,
       write: (msg) => addLog(msg),
@@ -79,7 +81,7 @@ app.post("/generate", async (req, res) => {
 // --------------------- Descargar ZIP con logs ---------------------
 app.get("/download-zip/:projectName", async (req, res) => {
   const { projectName } = req.params;
-  const projectPath = path.join(os.tmpdir(), projectName); // temporal
+  const projectPath = path.join(os.tmpdir(), projectName);
 
   if (!fs.existsSync(projectPath)) return res.status(404).send("Proyecto no encontrado.");
 
@@ -103,5 +105,5 @@ app.get("/download-zip/:projectName", async (req, res) => {
   await archive.finalize();
 });
 
-// ✅ Exportar handler para Vercel
+// ✅ Exportar app para Vercel
 export default app;
