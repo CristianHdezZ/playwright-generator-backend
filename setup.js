@@ -148,11 +148,11 @@ export async function generateProject(projectName, options = {}) {
   log(`package.json creado con dependencias fijas`, stream);
 
   // --------------------- Instalar dependencias ---------------------
-  await run('npm install', projectPath, stream);
-  log("🔧 Dependencias instaladas correctamente", stream);
+//   await run('npm install', projectPath, stream);
+//   log("🔧 Dependencias instaladas correctamente", stream);
 
   // --------------------- Inicializar Node y Playwright ---------------------
-  await run('npx playwright install', projectPath, stream);
+//   await run('npx playwright install', projectPath, stream);
 
   // Carpetas
   const dirs = [
