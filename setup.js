@@ -124,24 +124,24 @@ export async function generateProject(projectName, options = {}) {
     description: "",
     main: "index.js",
     scripts: {
-      test: "echo \"Error: no test specified\" && exit 1"
+      test: "npx cucumber-js"
     },
     devDependencies: {
-      "typescript": "^5.2.2",
-      "ts-node": "^10.9.1",
-      "@types/node": "^20.5.1",
-      "@serenity-js/core": "^4.13.0",
-      "@serenity-js/cucumber": "^4.13.0",
-      "@serenity-js/playwright": "^4.13.0",
-      "@serenity-js/serenity-bdd": "^4.13.0",
-      "@serenity-js/assertions": "^4.13.0",
-      "@serenity-js/web": "^4.13.0",
-      "@cucumber/cucumber": "^9.0.0",
-      "playwright": "^1.41.1",
-      "dotenv": "^16.1.4",
-      "chai": "^4.3.8",
-      "@types/chai": "^4.3.5",
-      "rimraf": "^5.0.0"
+        "typescript": "^5.2.2",
+        "ts-node": "^10.9.1",
+        "@types/node": "^20.5.1",
+        "@serenity-js/core": "^3.35.0",
+        "@serenity-js/cucumber": "^3.35.0",
+        "@serenity-js/playwright": "^3.35.0",
+        "@serenity-js/serenity-bdd": "^3.35.0",
+        "@serenity-js/assertions": "^3.35.0",
+        "@serenity-js/web": "^3.35.0",
+        "@cucumber/cucumber": "^9.0.0",
+        "playwright": "^1.41.1",
+        "dotenv": "^16.1.4",
+        "chai": "^4.3.8",
+        "@types/chai": "^4.3.5",
+        "rimraf": "^5.0.0"
     }
   };
   await fs.outputFile(path.join(projectPath, 'package.json'), JSON.stringify(pkg, null, 2), 'utf8');
@@ -193,14 +193,21 @@ export class CustomWorld { actor: any; }
 setWorldConstructor(CustomWorld);
 
 Before({ timeout: 40000 }, async function () {
-  const headless = process.env.HEADLESS === 'true' || false;
+  const headless = await process.env.HEADLESS === 'true' || false;  
+  //const headless = await process.env.HEADLESS !== 'false';
   const browser = await chromium.launch({ 
     channel: 'chrome',
-    headless,
+    headless: headless,
     args: [
-      '--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas','--no-first-run','--no-zygote',
-      '--single-process','--disable-gpu','--start-maximized'
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu',
+      '--start-maximized'
     ]
   });
   const context = await browser.newContext();
@@ -210,11 +217,15 @@ Before({ timeout: 40000 }, async function () {
     BrowseTheWebWithPlaywright.usingPage(page)
   );
 
-  this.cleanup = async () => { await page.close(); await context.close(); await browser.close(); }
+  this.cleanup = async () => {
+    await page.close();
+    await context.close();
+    await browser.close();
+  }
 });
 
 BeforeAll({ timeout: 40000 }, async function() {
-  log('BeforeAll: Starting test suite...', stream);
+  console.log('BeforeAll: Starting test suite...');
   configure({
     crew: [
       ['@serenity-js/serenity-bdd', { 
@@ -228,8 +239,9 @@ BeforeAll({ timeout: 40000 }, async function() {
   });
 });
 
-After(async function () { if(this.cleanup) await this.cleanup(); });
-AfterStep(async function () { if(this.actor) await this.actor.attemptsTo(TakeScreenshot.of('step')); });
+After(async function () {  if (this.cleanup) {    await this.cleanup();  }});
+
+AfterStep(async function () {  if(this.actor){    await this.actor.attemptsTo(TakeScreenshot.of('step')   );  }});
   `.trim(), stream);
 
   writeFile(path.join(projectPath,'src/Tasks/OpenPage.ts'), `
