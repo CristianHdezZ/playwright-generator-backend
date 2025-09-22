@@ -268,14 +268,17 @@ import { CustomWorld } from '../config/hooks';
 import { ReviweHomePage } from '../Questions/ReviweHomePage';
 
 Given('the user opens the application', { timeout: 40000 }, async function (this: CustomWorld) {
+  console.log('🚀 Opening the application');
   await this.actor.attemptsTo(OpenPage.atBaseUrl());
 });
 
 Then('the user should see the homepage',{ timeout: 40000 }, async function (this: CustomWorld) {
+  console.log('👀 Verifying the homepage is visible');
   await this.actor.attemptsTo(Ensure.that(ReviweHomePage.isVisibleMainContent, equals(true)));
 });
 
 Then('the page title should be My Store',{ timeout: 40000 }, async function (this: CustomWorld) {
+  console.log('🔖 Checking the page title is My Store');
   await this.actor.attemptsTo(Ensure.that(this.actor.answer(ReviweHomePage.isVisibleTitle), equals(true)));
 });
   `.trim(), stream);
